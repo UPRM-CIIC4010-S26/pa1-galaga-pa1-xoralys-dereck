@@ -36,6 +36,9 @@ void Program::Update() {
 
     if (!startup && !paused && !gameOver && pauseFrames <= 0) {
         Enemy::ManageEnemies(player->hitBox);
+        score += Enemy::pendingScore;
+        Enemy::pendingScore = 0;
+
         StdEnemy::attackReset();
         ManageEnemyRespawns();
         player->update();
@@ -56,15 +59,21 @@ void Program::Update() {
         }
 
         for (Projectile& p : Projectile::projectiles) { 
-            if ( (p.ID != 0) && (HitBox::Collision(p.getHitBox(), player->hitBox)) ){
+            if ((p.ID != 0) && (HitBox::Collision(p.getHitBox(), player->hitBox))) {
                 PlayerReset();
             }
             p.update();
         }
 
-        if (lives <= 0 && pauseFrames <= 0) gameOver = true;
         Projectile::CleanProjectiles();
         Projectile::ProjectileCollision();
+
+        while (score >= nextLifeScore && lives < 5) {
+            lives++;
+            nextLifeScore += 1000;
+        }
+
+        if (lives <= 0 && pauseFrames <= 0) gameOver = true;
     }
 }
 
@@ -73,12 +82,13 @@ void Program::Draw() {
     if (pauseFrames <= 0 && !gameOver) player->draw();
     for (Animation& a : Animation::animations) a.draw();
 
+    DrawText(TextFormat("Score: %i", score), 10, 10, 30, WHITE);
+
     for (int i = 0; i < lives; i++) {
          DrawTexturePro(ImageManager::SpriteSheet, Rectangle{0, 0, 17, 18}, 
                    Rectangle{10.0f + i * 30, GetScreenHeight() - 30.0f, 20, 20}, 
                    Vector2{0, 0}, 0, WHITE);
     }
-
 
     for (Projectile p : Projectile::projectiles) p.draw();
     for (std::pair<std::pair<float, float>, Enemy*>& p : Enemy::enemies) if (p.second) p.second->draw();
@@ -91,16 +101,24 @@ void Program::Draw() {
 void Program::ManageEnemyRespawns() {
     delay = std::max(delay - 1, 0);
 
+    respawnCooldown = 1080 - (score / 1000) * 120;
+    if (respawnCooldown < 360) {
+        respawnCooldown = 360;
+    }
+
     respawnCooldown -= 1;
     if (respawnCooldown <= 0) {
-        respawnCooldown = 1080;
+        respawnCooldown = 1080 - (score / 1000) * 120;
+        if (respawnCooldown < 360) {
+            respawnCooldown = 360;
+        }
+
         for (std::pair<std::pair<float, float>, Enemy*>& p : Enemy::enemies) {
             if (!p.second && p.first.second != 150) {
                 int eType = GetRandomValue(1, 3);
 
                 if (eType == 1) {
                     p.second = new StEnemy(GetScreenWidth() / 2 - 15, 0, true);
-                    respawnCooldown /= 2;
                 } else {
                     p.second = new StdEnemy(GetScreenWidth() / 2 - 15, 0, true);
                 }
@@ -154,6 +172,10 @@ void Program::KeyInputs() {
     if (!paused && !startup && IsKeyPressed('O')) gameOver = !gameOver;
     if (!gameOver && !paused && IsKeyPressed('I')) startup = !startup;
     if (IsKeyPressed('H')) HitBox::drawHitbox = !HitBox::drawHitbox;
+
+    if (!startup && !paused && !gameOver && IsKeyPressed(KEY_K)) {
+        score += 500;
+    }
     
     if (gameOver && IsKeyPressed(KEY_ENTER)) {
         gameOver = false;
@@ -165,7 +187,6 @@ void Program::KeyInputs() {
     }
 
     if (!startup && !paused && !gameOver && pauseFrames <= 0) player->keyInputs();
-   
 }
 
 void Program::PlayerReset() {
@@ -182,6 +203,7 @@ void Program::PlayerReset() {
 
 void Program::Reset() {
     Enemy::enemies.clear();
+    Enemy::pendingScore = 0;
     StdEnemy::attackInProgress = false;
     player = new Player((GetScreenWidth() / 2) - 15, GetScreenHeight() * 0.75f);
     respawnCooldown = 1080;
@@ -189,8 +211,10 @@ void Program::Reset() {
     count = 0;
     delay = 0;
     lives = 3;
+    score = 0;
+    nextLifeScore = 1000;
 
-     Enemy::enemies.push_back(std::pair<std::pair<float, float>, Enemy*> {
+    Enemy::enemies.push_back(std::pair<std::pair<float, float>, Enemy*> {
             std::pair<float, float>{350, 150}, 
             new SpEnemy(350, 150)
         });
