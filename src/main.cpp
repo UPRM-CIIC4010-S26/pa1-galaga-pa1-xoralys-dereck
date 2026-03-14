@@ -20,6 +20,8 @@ int main ()
 }
 
 	while (!WindowShouldClose()) {
+		UpdateMusicStream(SoundManager::background); 
+		
 		BeginDrawing();
 		ClearBackground(BLACK);
 

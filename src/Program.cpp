@@ -68,8 +68,10 @@ void Program::Update() {
         Projectile::CleanProjectiles();
         Projectile::ProjectileCollision();
 
-        while (score >= nextLifeScore && lives < 5) {
-            lives++;
+        if (score >= nextLifeScore) {
+            if (lives < 5) {
+                lives++;
+            }
             nextLifeScore += 1000;
         }
 
